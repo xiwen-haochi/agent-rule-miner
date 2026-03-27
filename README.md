@@ -36,7 +36,11 @@ Rule Miner 会**全量阅读**你的项目源码，提取这些隐藏的开发 D
 | GitHub Copilot | `.github/copilot-instructions.md` |
 | Claude Code | `CLAUDE.md` |
 | Cursor | `.cursorrules` |
+| Codex (OpenAI) | `.codex/instructions.md` |
 | Trae | `.trae/instructions.md` |
+| 其他 | 用户自定义路径 |
+
+规则生成后会**先询问你要写入哪个 IDE**，不会一次性全部覆盖。
 
 ---
 
@@ -178,7 +182,11 @@ Rule Miner **reads your entire codebase**, extracts these hidden development DNA
 | GitHub Copilot | `.github/copilot-instructions.md` |
 | Claude Code | `CLAUDE.md` |
 | Cursor | `.cursorrules` |
+| Codex (OpenAI) | `.codex/instructions.md` |
 | Trae | `.trae/instructions.md` |
+| Other | User-defined path |
+
+After generating rules, Rule Miner **asks which IDE to write to** before touching any files — no silent mass-overwrite.
 
 ---
 

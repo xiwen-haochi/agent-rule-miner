@@ -116,11 +116,39 @@ Extract evidence across these 8 categories. For each pattern, mentally note: "Wo
 - Is there a shared error type/class hierarchy?
 - Logging style: `console.error` / `logger.error` / structured JSON?
 
-**5. Comment & Documentation Style**
-- JSDoc / TSDoc / docstrings: used on all public functions, or only on complex ones, or barely used?
-- Comment language: English, Chinese, mixed?
-- TODO format: `// TODO(author): message` or `# TODO: message` or freeform?
-- Are comments explaining *what* or *why*? (why-only is a meaningful convention)
+**5. Comment & Documentation Style** *(treat this as equally important as naming — comments reveal how the team thinks)*
+
+Read at least 30 comment instances across different file types before drawing conclusions. Look for:
+
+**Density & placement**
+- Ratio of commented vs uncommented functions — is every function annotated, or only complex ones, or almost none?
+- Where do comments appear: above the function, inside the body, or both?
+- Inline end-of-line comments: common, rare, or never?
+- Block comments (`/* */`) vs line comments (`//` / `#`): which do they prefer for multi-line blocks?
+
+**Content philosophy**
+- Do comments explain *what* the code does, or *why* the decision was made? (why-only = strong convention to encode)
+- Are there "context comments" that reference tickets, links, or business rules? (e.g., `// See JIRA-1234`, `// Business rule: ...`)
+- Are there "warning comments" that flag traps or non-obvious behavior? (e.g., `// Don't change the order — side effect`, `// Intentionally not using X here because...`)
+- Are commented-out code blocks present — tolerated or never seen?
+
+**Format & language**
+- Comment language: English, Chinese, mixed — and does it follow the code language or differ?
+- Sentence style: full sentences with periods, or lowercase fragments?
+- JSDoc / TSDoc / docstrings: used on all public APIs, only on exported ones, only on complex ones, or barely used?
+- When JSDoc IS used: which tags appear (`@param`, `@returns`, `@throws`, `@example`, `@deprecated`)? Which are conspicuously absent?
+- Are `@param` descriptions just restating the type (useless) or adding semantics (useful)?
+
+**TODO / FIXME conventions**
+- Format: `// TODO(author): message`, `// TODO: message`, `# FIXME`, freeform?
+- Are TODOs ever resolved, or is the codebase littered with them (implies they're noise)?
+- Any custom tags like `// HACK:`, `// TEMP:`, `// NOTE:`?
+
+**Section dividers**
+- Do they use visual separators to chunk long files? (e.g., `// ─── Helpers ───`, `// === Public API ===`)
+- Any file-level header comments (author, purpose, license)?
+
+A project that writes almost no comments has a rule: *don't add noise comments*. A project that writes why-comments on every non-trivial block has a rule: *always explain the why*. Both are equally valid and must be captured faithfully.
 
 **6. Test Style**
 - Framework: Jest/Vitest/pytest/go test/RSpec?
@@ -183,38 +211,57 @@ Start with a 1-2 sentence project context header: tech stack, primary purpose if
 
 ---
 
-### Phase 5 — Preview & Confirmation
+### Phase 5 — Preview & IDE Selection
 
-Before writing any files, present the full rule text to the user in a code block and ask:
+Present the full rule text to the user in a code block, then ask two things at once:
 
-> "Here are the mined rules (X words). Does this look right? Anything to add, remove, or correct? Reply 'ok' to write to files, or give feedback."
+> "Here are the mined rules (X words). Does this look right? Anything to add, remove, or correct?
+>
+> Also — which IDE should I write these rules to?
+>
+> 1. Cursor
+> 2. Claude Code
+> 3. GitHub Copilot
+> 4. Codex (OpenAI)
+> 5. Trae
+> 6. All of the above
+> 7. Other — tell me your IDE and config file path
+>
+> Reply with the number (or multiple numbers separated by commas), or give feedback on the rules first."
 
-Do not write files until the user confirms.
+Do not write any files until the user responds. If the user gives feedback on the rules without answering the IDE question, revise the rules and ask again. If the user answers the IDE question but not the rules, clarify rules first before writing.
+
+If the user selects **7 (Other)**: ask them to provide the config file path and any format preference (plain text or Markdown). Use that path for writing.
 
 ---
 
-### Phase 6 — Write to IDE Config Files
+### Phase 6 — Write to Selected IDE Config Files
 
-After user confirmation, write rules to all applicable files. For each target:
+Write rules only to the IDE(s) the user selected. Reference the table below for target paths and formats.
 
-**Check if file exists first.** If it exists, read it and merge: append a clearly marked section rather than overwriting existing content.
+| # | IDE / Tool | Target Path | Format | Notes |
+|---|-----------|-------------|--------|-------|
+| 1 | Cursor | `.cursorrules` | Plain text | Strip `## Heading` → `HEADING:` |
+| 2 | Claude Code | `CLAUDE.md` | Markdown | — |
+| 3 | GitHub Copilot | `.github/copilot-instructions.md` | Markdown | Create `.github/` dir if missing |
+| 4 | Codex (OpenAI) | `.codex/instructions.md` | Markdown | Create `.codex/` dir if missing |
+| 5 | Trae | `.trae/instructions.md` | Markdown | Create `.trae/` dir if missing |
+| 7 | Other | *(user-provided path)* | *(user preference)* | — |
 
-| IDE / Tool | Target Path | Format |
-|-----------|-------------|--------|
-| GitHub Copilot | `.github/copilot-instructions.md` | Markdown |
-| Claude Code | `CLAUDE.md` | Markdown |
-| Cursor | `.cursorrules` | Plain text |
-| Trae | `.trae/instructions.md` | Markdown |
+**For every target file:**
+1. Check if the file already exists
+2. If it exists: read it, look for `<!-- rule-miner-start -->` / `<!-- rule-miner-end -->` markers
+   - Markers present → replace content between them
+   - No markers → append the mined rules wrapped in markers at the end
+3. If it does not exist: create the file with the rules wrapped in markers
+4. For `.cursorrules` (plain text), use `# --- rule-miner-start ---` / `# --- rule-miner-end ---` instead
 
-For `.cursorrules`, strip Markdown heading syntax (replace `## Heading` with `HEADING:`) since Cursor treats it as plain text.
-
-For each file written, confirm the path and word count. Example:
+After writing, confirm each file:
 ```
-✓ .github/copilot-instructions.md (843 words)
-✓ CLAUDE.md (843 words)  
 ✓ .cursorrules (843 words)
-✓ .trae/instructions.md (843 words)
+✓ CLAUDE.md (843 words)
 ```
+If the user selected multiple IDEs, write all of them and show a combined summary.
 
 ---
 
@@ -273,16 +320,4 @@ Before presenting rules to the user, verify:
 
 This example is ~280 words. Real output will be longer but must stay under 1000.
 
----
 
-## Merge Strategy for Existing Config Files
-
-When a target config file already exists:
-
-1. Read the entire existing content
-2. Look for a `<!-- rule-miner-start -->` / `<!-- rule-miner-end -->` marker pair
-3. If markers exist: **replace** only the content between them (this is a re-run)
-4. If no markers exist: **append** at the end with markers wrapping the new content
-5. For `.cursorrules` (plain text), use `# --- rule-miner-start ---` / `# --- rule-miner-end ---` comments instead
-
-This ensures user-written rules are never lost, and re-runs cleanly update only the mined section.
