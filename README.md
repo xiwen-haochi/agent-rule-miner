@@ -55,6 +55,18 @@ your-project/
 
 ---
 
+## 快速安装
+
+推荐使用 skills CLI 一键安装：
+
+```sh
+npx skills add xiwen-haochi/agent-rule-miner
+```
+
+或手动复制 `rule-miner/` 文件夹到项目根目录。
+
+---
+
 ## 使用方法
 
 安装后，在 AI 对话中输入以下任一指令：
