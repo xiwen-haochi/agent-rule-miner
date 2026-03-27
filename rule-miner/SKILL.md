@@ -44,7 +44,7 @@ The core insight: most projects have drifted from language defaults in specific,
 | **Very small project** (<5 source files) | Proceed but warn: "Small sample size — rules may change as the project grows. Re-run after more code is written." Lower the frequency threshold to ≥2 occurrences. |
 | **Very large project** (>500 source files or token limit hit) | Use stratified sampling: read 100% of core/shared modules, then sample 30% of remaining files proportionally from each directory. Note in output: "Rules based on sampled analysis of large codebase." |
 | **Mixed languages** (e.g., Python backend + TypeScript frontend) | Generate separate rule sections per language, clearly labeled. Share cross-language rules (e.g., directory naming) in a common section. |
-| **Generated/scaffolded code dominates** | Detect generated markers (auto-generated comments, identical structures). Exclude generated files from pattern extraction. If >80% is generated, warn the user. |
+| **Generated/scaffolded code dominates** | Exclude generated files (already skipped in Phase 2). If >80% is generated, warn the user. |
 | **Existing IDE config files** | Read existing content. Append mined rules in a clearly marked `<!-- rule-miner -->` section. Never delete the user's existing rules. |
 | **Contradictory patterns** (50/50 split) | Do not write a rule for that pattern. Optionally mention it to the user: "Inconsistent pattern detected for X — no rule generated." |
 
@@ -89,34 +89,52 @@ While reading, actively track patterns across files using a mental tally. You ca
 
 ### Phase 3 — Pattern Extraction
 
-Extract evidence across these 8 categories. For each pattern, mentally note: "Would a new developer writing fresh code in this language naturally do this?" If yes, it's not worth a rule. If no, it IS worth a rule.
+Extract evidence across these 9 categories. For each pattern, mentally note: "Would a new developer writing fresh code in this language naturally do this?" If yes, it's not worth a rule. If no, it IS worth a rule.
 
-**1. Naming Conventions**
+**1. Function & Code Body Patterns** *(this is the #1 category — AI writes function bodies 90% of the time)*
+
+This category determines whether AI-generated code *reads* like the rest of the project line-by-line.
+
+- **Function length**: short (5-15 lines) or long (30+)? If most functions are short, the team values decomposition — AI should never generate 50-line functions.
+- **Function declarations vs arrow functions**: `function foo()` vs `const foo = () =>`? Mixed usage or strict preference?
+- **Parameter style**: individual params `(name, age, email)` vs options object `(options: CreateUserOpts)`? At what param count does the project switch?
+- **Destructuring**: heavy destructuring in params `({ name, age })`, in assignments `const { x, y } = obj`, or minimal?
+- **Return style**: early returns with guard clauses, or single return at the end? Ternary expressions or if/else blocks?
+- **Async patterns**: `async/await` everywhere, or `.then()` chains? Are `try/catch` blocks around every await, or is there a global error boundary?
+- **Variable declarations**: `const` by default, or `let`? Any `var` usage? How often are variables reassigned?
+- **Immutability preference**: spread operators / `Object.assign` / `.map()` for new arrays, or in-place mutation?
+- **Type system patterns** (typed languages only): `interface` vs `type`? Enums vs union types vs const objects? `null` vs `undefined`? How heavy is generic usage?
+- **String style**: template literals vs concatenation? Single vs double quotes (if not linter-enforced)? Multi-line strings: template literals or array `.join()`?
+- **Chaining / piping**: does the project chain method calls (`arr.filter().map().reduce()`) or use intermediate variables?
+
+These micro-patterns are invisible in naming or organization rules, but they're what make code look "native" to a project.
+
+**2. Naming Conventions**
 - File names: `camelCase.ts` vs `kebab-case.ts` vs `snake_case.py`?
 - Classes/interfaces/types: PascalCase fine, but any suffix conventions? (`Service`, `Manager`, `Handler`, `Repo`, `Impl`)?
 - Functions/methods: any prefix patterns (`handle*`, `get*`, `on*`, `use*` for hooks)?
 - Variables: any notable patterns (`_private`, `SCREAMING_SNAKE` for constants, `I` prefix for interfaces)?
 - One deviating convention is worth 50 generic ones.
 
-**2. Code Organization**
+**3. Code Organization**
 - Directory naming: plural or singular? (`utils/` vs `util/`, `services/` vs `service/`)
 - Index file usage: barrel exports (`index.ts`) everywhere, or sparse?
 - File-per-class vs multi-export files?
 - Any circular dependency avoidance strategies visible in the structure?
 
-**3. Import / Dependency Style**
+**4. Import / Dependency Style**
 - Import ordering: stdlib → third-party → local? Or mixed? Enforced by tooling or by hand?
 - Aliasing: `import * as X`, destructured only, or both?
 - Relative vs absolute paths (`../../utils` vs `@/utils`)?
 - Any imports that always appear together?
 
-**4. Error Handling**
+**5. Error Handling**
 - Exceptions vs Result/Either types vs error codes?
 - Are errors wrapped or re-thrown raw?
 - Is there a shared error type/class hierarchy?
 - Logging style: `console.error` / `logger.error` / structured JSON?
 
-**5. Comment & Documentation Style** *(treat this as equally important as naming — comments reveal how the team thinks)*
+**6. Comment & Documentation Style** *(treat this as equally important as naming — comments reveal how the team thinks)*
 
 Read at least 30 comment instances across different file types before drawing conclusions. Look for:
 
@@ -150,14 +168,14 @@ Read at least 30 comment instances across different file types before drawing co
 
 A project that writes almost no comments has a rule: *don't add noise comments*. A project that writes why-comments on every non-trivial block has a rule: *always explain the why*. Both are equally valid and must be captured faithfully.
 
-**6. Test Style**
+**7. Test Style**
 - Framework: Jest/Vitest/pytest/go test/RSpec?
 - Test file co-location or separate `__tests__` / `tests/` directory?
 - Describe/it nesting depth convention?
 - Mock philosophy: heavy mocks, minimal mocks, or integration-preferred?
 - Test data: factory helpers, fixtures files, or inline literals?
 
-**7. Hidden Associations (Coupling Patterns)**
+**8. Hidden Associations (Coupling Patterns)**
 Look for things that always appear together across the codebase:
 - "Every service file always has a corresponding types file"
 - "Every exported function always has a matching test"
@@ -165,7 +183,7 @@ Look for things that always appear together across the codebase:
 - "Every database call is always wrapped in a transaction helper"
 These are the most valuable rules — they encode implicit architecture contracts.
 
-**8. Anti-Patterns (What This Project Never Does)**
+**9. Anti-Patterns (What This Project Never Does)**
 What common language/framework idioms are conspicuously absent?
 - No `any` types in TypeScript?
 - No raw SQL strings (always uses query builder)?
@@ -175,6 +193,75 @@ What common language/framework idioms are conspicuously absent?
 These are as important as positive rules — they prevent AI from introducing patterns the team actively avoids.
 
 ---
+
+### Phase 3.5 — Domain-Specific Pattern Check (Conditional)
+
+If Phase 1 identified the project as a **frontend app**, **backend service**, or **full-stack project**, run these additional checks. Skip entirely for libraries, CLIs, or infrastructure tools.
+
+#### Frontend Projects (React / Vue / Angular / Svelte / etc.)
+
+**Component patterns**
+- Component structure: one file per component, or folder-per-component (`Button/index.tsx` + `Button.module.css` + `Button.test.tsx`)?
+- Functional components only, or class components still present? Mixed?
+- Component size: small single-responsibility or large "page" components?
+- Props: destructured in parameter `({ name, onClick })` or accessed via `props.name`?
+- Default props: default parameter values, or separate `defaultProps` / `withDefaults`?
+
+**State management**
+- Which tool: Redux / Zustand / Pinia / MobX / Context / Jotai / signals / none?
+- Where does state live: global store, component-local, URL params, or a mix?
+- Data fetching: custom hooks, React Query / SWR / TanStack, or in components directly?
+- Loading/error states: how are they represented? Discriminated unions, boolean flags, or enums?
+
+**Styling approach**
+- Method: CSS Modules, Tailwind utility classes, styled-components / Emotion, SCSS/LESS, inline styles?
+- Class naming: BEM, utility-first, or freeform?
+- Theme/design tokens: CSS variables, JS theme objects, or Tailwind config?
+- Responsive strategy: mobile-first or desktop-first breakpoints?
+
+**Routing & pages**
+- File-based routing (Next.js / Nuxt convention) or config-based?
+- Route guards / auth wrappers: HOC, middleware, or layout-level?
+- Page loading patterns: suspense, skeleton, spinner, or none?
+
+**Event handling**
+- Handler naming: `onClick` / `handleClick` / `onClickHandler`?
+- Are handlers defined inline in JSX, or extracted as named functions above the return?
+- Form handling: controlled vs uncontrolled? Which form library (react-hook-form, formik, native)?
+
+#### Backend Projects (Express / NestJS / FastAPI / Django / Spring / Go net/http / etc.)
+
+**API design**
+- REST naming style: plural resources (`/users`) or singular (`/user`)? Nested routes (`/users/:id/posts`) or flat?
+- Response envelope: `{ data, error, meta }` wrapper, or raw payload?
+- Pagination: cursor-based, offset/limit, or page/size? Where are defaults?
+- API versioning: URL path (`/v1/`), header, or none?
+- HTTP status codes: precise (201, 204, 409) or loose (200 for everything, 500 for errors)?
+
+**Request lifecycle**
+- Middleware ordering: auth → validation → handler → error handler? Any custom pattern?
+- Input validation: where does it happen — controller, service, or dedicated middleware? Which library (Joi, Zod, class-validator, Pydantic)?
+- DTO / request types: separate type per endpoint, or shared types?
+
+**Database patterns**
+- ORM, query builder, or raw queries? Which one (Prisma, TypeORM, SQLAlchemy, GORM, etc.)?
+- Repository pattern or direct model access from services?
+- Migrations: framework-managed or manual SQL files?
+- Transactions: explicit `begin/commit/rollback` or decorator/wrapper-based?
+- Soft delete or hard delete?
+
+**Authentication & authorization**
+- Auth mechanism: JWT, session, OAuth, or API key?
+- Where is the auth check: middleware, decorator, or per-handler?
+- Role/permission check style: RBAC, ABAC, or simple role strings?
+
+**Logging & observability**
+- Log library: winston, pino, logrus, slog, logging (Python)?
+- Structured logs (JSON) or plain text?
+- Request ID / correlation ID propagation?
+- Log levels actually used: just `info`+`error`, or full `debug`/`warn`/`trace`?
+
+Only capture patterns that are **consistent** (seen in 80%+ of relevant files). If the project mixes approaches, note the inconsistency and skip the rule.
 
 ### Phase 4 — Rule Synthesis
 
